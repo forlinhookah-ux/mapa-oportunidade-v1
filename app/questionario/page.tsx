@@ -124,7 +124,7 @@ sessionStorage.setItem(
 );
 
 window.location.href =
-  'https://pay.cakto.com.br/gz6wagz_1173401';
+  `https://pay.cakto.com.br/gz6wagz_1173401?sck=${encodeURIComponent(data.id)}`;
  }
 
   return (
