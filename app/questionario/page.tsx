@@ -90,7 +90,7 @@ export default function Questionario() {
     });
   }
 
-  function next() {
+  async function next() {
     if (!valid) return;
 
     if (step < questions.length - 1) {
@@ -98,14 +98,34 @@ export default function Questionario() {
       return;
     }
 
-    sessionStorage.setItem(
-      'mapa_answers',
-      JSON.stringify(answers)
-    );
+   const response = await fetch('/api/salvar-respostas', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(answers),
+});
 
-    window.location.href =
-      'https://pay.cakto.com.br/gz6wagz_1173401';
-  }
+if (!response.ok) {
+  alert('Não foi possível salvar suas respostas. Tente novamente.');
+  return;
+}
+
+const data = await response.json();
+
+sessionStorage.setItem(
+  'mapa_answers',
+  JSON.stringify(answers)
+);
+
+sessionStorage.setItem(
+  'mapa_id',
+  data.id
+);
+
+window.location.href =
+  'https://pay.cakto.com.br/gz6wagz_1173401';
+ }
 
   return (
     <main className="wrap">
