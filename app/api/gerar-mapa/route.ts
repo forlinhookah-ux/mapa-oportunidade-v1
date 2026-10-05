@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -7,7 +8,52 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
   try {
-    const answers = await request.json();
+    const body = await request.json();
+
+    const mapaId = body.mapa_id;
+
+    if (!mapaId) {
+      return NextResponse.json(
+        {
+          error: 'Mapa não identificado.',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // Busca o mapa no Supabase
+    const { data: mapa, error: mapaError } = await supabaseAdmin
+      .from('mapas')
+      .select('id, respostas, pago')
+      .eq('id', mapaId)
+      .single();
+
+    if (mapaError || !mapa) {
+      return NextResponse.json(
+        {
+          error: 'Mapa não encontrado.',
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    // Bloqueia geração antes do pagamento
+    if (!mapa.pago) {
+      return NextResponse.json(
+        {
+          error: 'Pagamento ainda não confirmado.',
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const answers = mapa.respostas;
 
     const prompt = `
 Você é o consultor estratégico da ALFORTECH responsável por criar o
@@ -267,9 +313,9 @@ ESTRUTURA OBRIGATÓRIA:
       .replace(/```/g, '')
       .trim();
 
-    const mapa = JSON.parse(cleanText);
+    const resultado = JSON.parse(cleanText);
 
-    return NextResponse.json(mapa);
+    return NextResponse.json(resultado);
   } catch (error) {
     console.error('Erro ao gerar mapa:', error);
 

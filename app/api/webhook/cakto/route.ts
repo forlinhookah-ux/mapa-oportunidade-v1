@@ -5,8 +5,40 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    console.log('Webhook Cakto recebido:', body);
+    console.log('Webhook Cakto recebido');
 
+    // Verifica o segredo do webhook
+    const webhookSecret = process.env.CAKTO_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.error('CAKTO_WEBHOOK_SECRET não configurado');
+
+      return NextResponse.json(
+        {
+          received: false,
+          error: 'Webhook não configurado.',
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (body.secret !== webhookSecret) {
+      console.error('Secret do webhook inválido');
+
+      return NextResponse.json(
+        {
+          received: false,
+          error: 'Secret inválido.',
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    // Só processa compra aprovada
     if (body.event !== 'purchase_approved') {
       return NextResponse.json({
         received: true,
@@ -30,6 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // Marca o mapa como pago
     const { error } = await supabaseAdmin
       .from('mapas')
       .update({

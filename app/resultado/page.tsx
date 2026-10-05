@@ -39,35 +39,43 @@ export default function Resultado() {
 
   useEffect(() => {
     async function gerarMapa() {
-      const saved = sessionStorage.getItem('mapa_answers');
+      const savedAnswers = sessionStorage.getItem('mapa_answers');
+      const mapaId = sessionStorage.getItem('mapa_id');
 
-      if (!saved) {
-        setError('Nenhuma resposta encontrada.');
+      if (!mapaId) {
+        setError(
+          'Não foi possível identificar seu mapa.'
+        );
         setLoading(false);
         return;
       }
 
+      if (savedAnswers) {
+        try {
+          const parsedAnswers = JSON.parse(savedAnswers);
+          setAnswers(parsedAnswers);
+        } catch {
+          console.error('Não foi possível ler as respostas salvas.');
+        }
+      }
+
       try {
-        const parsedAnswers = JSON.parse(saved);
-
-        setAnswers(parsedAnswers);
-
         const response = await fetch('/api/gerar-mapa', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(parsedAnswers),
+          body: JSON.stringify({
+            mapa_id: mapaId,
+          }),
         });
-
-        if (!response.ok) {
-          throw new Error('Erro ao gerar o mapa.');
-        }
 
         const data = await response.json();
 
-        if (data.error) {
-          throw new Error(data.error);
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Não foi possível gerar o mapa.'
+          );
         }
 
         setMapa(data);
@@ -75,7 +83,9 @@ export default function Resultado() {
         console.error(err);
 
         setError(
-          'Não foi possível gerar seu mapa. Tente novamente.'
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível gerar seu mapa. Tente novamente.'
         );
       } finally {
         setLoading(false);
@@ -311,8 +321,6 @@ export default function Resultado() {
                       : undefined,
                 }}
               >
-                {/* CABEÇALHO */}
-
                 <div
                   style={{
                     fontSize: '28px',
@@ -333,8 +341,6 @@ export default function Resultado() {
                 <p>
                   {opportunity.descricao}
                 </p>
-
-                {/* RESUMO */}
 
                 <div
                   style={{
@@ -386,8 +392,6 @@ export default function Resultado() {
                   </div>
                 </div>
 
-                {/* BOTÃO */}
-
                 <div
                   style={{
                     marginTop: '20px',
@@ -399,8 +403,6 @@ export default function Resultado() {
                       : '▼ Ver detalhes completos'}
                   </strong>
                 </div>
-
-                {/* DETALHES */}
 
                 {isOpen && (
                   <div
