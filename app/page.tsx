@@ -48,7 +48,7 @@ export default function Home() {
           <div className="heroActions">
             <a href="/questionario" className="mainCta">
               <span>CRIAR MEU MAPA</span>
-              <strong>R$27</strong>
+              <strong>R$19,90</strong>
               <b>→</b>
             </a>
 
@@ -528,7 +528,7 @@ export default function Home() {
             <h2>
               Descubra suas oportunidades
               <br />
-              por apenas <span>R$27.</span>
+              por apenas <span>R$19,90.</span>
             </h2>
 
             <p>
@@ -540,7 +540,7 @@ export default function Home() {
             <div className="priceBox">
               <div className="price">
                 <small>R$</small>
-                <strong>27</strong>
+                <strong>19,90</strong>
               </div>
 
               <div className="priceInfo">
@@ -625,7 +625,7 @@ export default function Home() {
 
           <a href="/questionario" className="mainCta finalCta">
             <span>CRIAR MEU MAPA</span>
-            <strong>R$27</strong>
+            <strong>R$19,90</strong>
             <b>→</b>
           </a>
 
