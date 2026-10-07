@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import MapaVisual from '../components/MapaVisual';
 
@@ -45,8 +45,9 @@ type Answers = {
   goal: string | string[];
 };
 
-export default function Resultado() {
-    const searchParams = useSearchParams();
+function ResultadoConteudo() {
+  const searchParams = useSearchParams();
+
   const [resultado, setResultado] =
     useState<ResultadoMapa | null>(null);
 
@@ -72,11 +73,12 @@ export default function Resultado() {
         const answersStorage =
           sessionStorage.getItem('mapa_answers');
 
-       const mapaIdUrl = searchParams.get('mapa_id');
+        const mapaIdUrl =
+          searchParams.get('mapa_id');
 
-const mapaIdSalvo =
-  mapaIdUrl ||
-  sessionStorage.getItem('mapa_id');
+        const mapaIdSalvo =
+          mapaIdUrl ||
+          sessionStorage.getItem('mapa_id');
 
         if (!mapaIdSalvo) {
           setErro('Mapa não encontrado.');
@@ -159,8 +161,6 @@ const mapaIdSalvo =
               return;
             }
 
-            // Pagamento ainda não chegou.
-            // Espera e tenta novamente.
             if (
               response.status === 403
             ) {
@@ -203,7 +203,6 @@ const mapaIdSalvo =
               return;
             }
 
-            // Sucesso!
             if (!cancelado) {
               setResultado(data);
               setCarregando(false);
@@ -216,8 +215,6 @@ const mapaIdSalvo =
               error
             );
 
-            // Se ainda houver tentativas,
-            // aguarda e tenta novamente.
             if (
               i <
               MAX_TENTATIVAS - 1
@@ -265,7 +262,7 @@ const mapaIdSalvo =
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [searchParams]);
 
   if (carregando) {
     return (
@@ -306,7 +303,7 @@ const mapaIdSalvo =
           </div>
 
           <p className="attempt">
-            Preparando automaticamente...
+            Tentativa {tentativa} de 10...
           </p>
         </div>
 
@@ -501,5 +498,91 @@ const mapaIdSalvo =
       answers={answers}
       mapaId={mapaId ?? undefined}
     />
+  );
+}
+
+export default function Resultado() {
+  return (
+    <Suspense
+      fallback={
+        <main className="page">
+          <div className="loading">
+            <div className="loader" />
+
+            <p className="eyebrow">
+              ALFORTECH • MAPA DA OPORTUNIDADE
+            </p>
+
+            <h1>
+              Preparando seu mapa...
+            </h1>
+
+            <style jsx>{`
+              .page {
+                min-height: 100vh;
+                background:
+                  radial-gradient(
+                    circle at 50% 0%,
+                    rgba(37, 99, 235, 0.2),
+                    transparent 35%
+                  ),
+                  #05070d;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 40px 20px;
+                font-family: Arial, Helvetica, sans-serif;
+              }
+
+              .loading {
+                width: 100%;
+                max-width: 650px;
+                text-align: center;
+              }
+
+              .loader {
+                width: 54px;
+                height: 54px;
+                border: 4px solid rgba(
+                  255,
+                  255,
+                  255,
+                  0.12
+                );
+                border-top-color: #38bdf8;
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+                margin: 0 auto 30px;
+              }
+
+              .eyebrow {
+                color: #38bdf8;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 0.18em;
+              }
+
+              h1 {
+                font-size: clamp(
+                  30px,
+                  6vw,
+                  52px
+                );
+                margin: 14px 0;
+              }
+
+              @keyframes spin {
+                to {
+                  transform: rotate(360deg);
+                }
+              }
+            `}</style>
+          </div>
+        </main>
+      }
+    >
+      <ResultadoConteudo />
+    </Suspense>
   );
 }
