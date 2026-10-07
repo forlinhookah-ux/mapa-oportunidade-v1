@@ -1,635 +1,505 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import MapaVisual from '../components/MapaVisual';
 
-type Answers = Record<string, string | string[]>;
-
-type Opportunity = {
+type Oportunidade = {
   titulo: string;
   descricao: string;
+  modelo_receita: string;
+  preco: string;
+  faturamento_estimado: string;
+  custo_estimado: string;
+  lucro_estimado: string;
+  clientes_para_meta: string;
+  capacidade_semanal: string;
+  horas_necessarias: string;
+  compatibilidade_meta: string;
+  velocidade: 'Rápida' | 'Média' | 'Lenta';
+  dificuldade: 'Baixa' | 'Média' | 'Alta';
   o_que_vender: string;
   cliente_ideal: string;
-  preco_sugerido: string;
-  modelo_de_receita: string;
-  clientes_para_meta: string;
-  investimento_inicial: string;
-  dificuldade: string;
-  velocidade_para_primeira_venda: string;
+  investimento: string;
   como_conseguir_clientes: string;
   potencial: string;
   por_que_combina: string;
 };
 
-type Mapa = {
-  oportunidades: Opportunity[];
+type ResultadoMapa = {
+  aderencia: number;
   recomendacao: {
     titulo: string;
-    motivo: string;
-    primeiro_passo: string;
+    por_que: string;
+    primeiro_movimento?: string;
   };
+  oportunidades: Oportunidade[];
   plano_7_dias: string[];
 };
 
+type Answers = {
+  skills: string;
+  interests: string;
+  time: string | string[];
+  resources: string | string[];
+  goal: string | string[];
+};
+
 export default function Resultado() {
-  const [answers, setAnswers] = useState<Answers | null>(null);
-  const [mapa, setMapa] = useState<Mapa | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [openSection, setOpenSection] = useState<string | null>(null);
+    const searchParams = useSearchParams();
+  const [resultado, setResultado] =
+    useState<ResultadoMapa | null>(null);
+
+  const [mapaId, setMapaId] =
+    useState<string | null>(null);
+
+  const [answers, setAnswers] =
+    useState<Answers | null>(null);
+
+  const [erro, setErro] = useState('');
+
+  const [carregando, setCarregando] =
+    useState(true);
+
+  const [tentativa, setTentativa] =
+    useState(0);
 
   useEffect(() => {
-    async function gerarMapa() {
-      const savedAnswers = sessionStorage.getItem('mapa_answers');
-      const mapaId = sessionStorage.getItem('mapa_id');
+    let cancelado = false;
 
-      if (!mapaId) {
-        setError(
-          'Não foi possível identificar seu mapa.'
-        );
-        setLoading(false);
-        return;
-      }
-
-      if (savedAnswers) {
-        try {
-          const parsedAnswers = JSON.parse(savedAnswers);
-          setAnswers(parsedAnswers);
-        } catch {
-          console.error('Não foi possível ler as respostas salvas.');
-        }
-      }
-
+    async function carregarMapa() {
       try {
-        const response = await fetch('/api/gerar-mapa', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            mapa_id: mapaId,
-          }),
-        });
+        const answersStorage =
+          sessionStorage.getItem('mapa_answers');
 
-        const data = await response.json();
+       const mapaIdUrl = searchParams.get('mapa_id');
 
-        if (!response.ok) {
-          throw new Error(
-            data.error || 'Não foi possível gerar o mapa.'
-          );
+const mapaIdSalvo =
+  mapaIdUrl ||
+  sessionStorage.getItem('mapa_id');
+
+        if (!mapaIdSalvo) {
+          setErro('Mapa não encontrado.');
+          setCarregando(false);
+          return;
         }
 
-        setMapa(data);
-      } catch (err) {
-        console.error(err);
+        setMapaId(mapaIdSalvo);
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Não foi possível gerar seu mapa. Tente novamente.'
+        if (answersStorage) {
+          try {
+            setAnswers(
+              JSON.parse(answersStorage)
+            );
+          } catch (error) {
+            console.error(
+              'Erro ao ler respostas salvas:',
+              error
+            );
+          }
+        }
+
+        const MAX_TENTATIVAS = 10;
+
+        for (
+          let i = 0;
+          i < MAX_TENTATIVAS;
+          i++
+        ) {
+          if (cancelado) return;
+
+          setTentativa(i + 1);
+
+          try {
+            const response = await fetch(
+              '/api/gerar-mapa',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type':
+                    'application/json',
+                },
+                body: JSON.stringify({
+                  mapa_id: mapaIdSalvo,
+                }),
+              }
+            );
+
+            const contentType =
+              response.headers.get(
+                'content-type'
+              ) || '';
+
+            let data: any = null;
+
+            if (
+              contentType.includes(
+                'application/json'
+              )
+            ) {
+              data =
+                await response.json();
+            } else {
+              const textoResposta =
+                await response.text();
+
+              console.error(
+                'A API retornou conteúdo que não é JSON:',
+                textoResposta
+              );
+
+              if (!cancelado) {
+                setErro(
+                  'O servidor retornou uma resposta inválida. Verifique o terminal do projeto.'
+                );
+
+                setCarregando(false);
+              }
+
+              return;
+            }
+
+            // Pagamento ainda não chegou.
+            // Espera e tenta novamente.
+            if (
+              response.status === 403
+            ) {
+              if (
+                i <
+                MAX_TENTATIVAS - 1
+              ) {
+                await new Promise(
+                  (resolve) =>
+                    setTimeout(
+                      resolve,
+                      2000
+                    )
+                );
+
+                continue;
+              }
+
+              if (!cancelado) {
+                setErro(
+                  'O pagamento ainda não foi confirmado. Aguarde alguns instantes e tente novamente.'
+                );
+
+                setCarregando(false);
+              }
+
+              return;
+            }
+
+            if (!response.ok) {
+              if (!cancelado) {
+                setErro(
+                  data?.error ||
+                    'Não foi possível gerar seu mapa.'
+                );
+
+                setCarregando(false);
+              }
+
+              return;
+            }
+
+            // Sucesso!
+            if (!cancelado) {
+              setResultado(data);
+              setCarregando(false);
+            }
+
+            return;
+          } catch (error) {
+            console.error(
+              'Erro na tentativa de carregar o mapa:',
+              error
+            );
+
+            // Se ainda houver tentativas,
+            // aguarda e tenta novamente.
+            if (
+              i <
+              MAX_TENTATIVAS - 1
+            ) {
+              await new Promise(
+                (resolve) =>
+                  setTimeout(
+                    resolve,
+                    2000
+                  )
+              );
+
+              continue;
+            }
+
+            if (!cancelado) {
+              setErro(
+                'Ocorreu um erro ao gerar seu mapa.'
+              );
+
+              setCarregando(false);
+            }
+
+            return;
+          }
+        }
+      } catch (error) {
+        console.error(
+          'Erro ao carregar mapa:',
+          error
         );
-      } finally {
-        setLoading(false);
+
+        if (!cancelado) {
+          setErro(
+            'Ocorreu um erro ao gerar seu mapa.'
+          );
+
+          setCarregando(false);
+        }
       }
     }
 
-    gerarMapa();
+    carregarMapa();
+
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
-  function toggleSection(section: string) {
-    setOpenSection(
-      openSection === section ? null : section
-    );
-  }
-
-  if (loading) {
+  if (carregando) {
     return (
-      <main className="wrap">
-        <div className="formbox">
-          <div className="q">
-            ALFORTECH
-          </div>
+      <main className="page">
+        <div className="loading">
+          <div className="loader" />
 
-          <h1>
-            Analisando seu perfil...
-          </h1>
-
-          <p className="muted">
-            Nossa inteligência artificial está procurando
-            oportunidades compatíveis com suas habilidades,
-            interesses, recursos e meta financeira.
+          <p className="eyebrow">
+            ALFORTECH • MAPA DA OPORTUNIDADE
           </p>
 
-          <div className="option active">
-            🧠 Analisando suas habilidades...
+          <h1>
+            Preparando seu mapa...
+          </h1>
+
+          <p>
+            Seu pagamento está sendo
+            confirmado e estamos preparando
+            seu mapa personalizado.
+          </p>
+
+          <div className="loadingSteps">
+            <span>
+              ✓ Perfil analisado
+            </span>
+
+            <span>
+              ✓ Recursos identificados
+            </span>
+
+            <span>
+              ● Confirmando pagamento
+            </span>
+
+            <span>
+              ● Gerando oportunidades
+            </span>
           </div>
 
-          <div className="option active">
-            🎯 Cruzando seus interesses...
-          </div>
-
-          <div className="option active">
-            💰 Calculando possibilidades de renda...
-          </div>
-
-          <div className="option active">
-            🚀 Montando seu plano de ação...
-          </div>
+          <p className="attempt">
+            Preparando automaticamente...
+          </p>
         </div>
+
+        <style jsx>{`
+          .page {
+            min-height: 100vh;
+            background:
+              radial-gradient(
+                circle at 50% 0%,
+                rgba(37, 99, 235, 0.2),
+                transparent 35%
+              ),
+              #05070d;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .loading {
+            width: 100%;
+            max-width: 650px;
+            text-align: center;
+          }
+
+          .loader {
+            width: 54px;
+            height: 54px;
+            border: 4px solid rgba(
+              255,
+              255,
+              255,
+              0.12
+            );
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 30px;
+          }
+
+          .eyebrow {
+            color: #38bdf8;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+          }
+
+          h1 {
+            font-size: clamp(
+              30px,
+              6vw,
+              52px
+            );
+            margin: 14px 0;
+          }
+
+          .loading p:not(.eyebrow) {
+            color: #94a3b8;
+            line-height: 1.7;
+            font-size: 16px;
+          }
+
+          .loadingSteps {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 30px;
+            color: #cbd5e1;
+            font-size: 14px;
+          }
+
+          .attempt {
+            margin-top: 24px;
+            font-size: 13px !important;
+            color: #64748b !important;
+          }
+
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </main>
     );
   }
 
-  if (error || !answers || !mapa) {
+  if (erro || !resultado) {
     return (
-      <main className="wrap">
-        <div className="formbox">
+      <main className="page">
+        <div className="errorBox">
+          <div className="errorIcon">
+            !
+          </div>
+
+          <p className="eyebrow">
+            ALFORTECH
+          </p>
+
           <h1>
             Não conseguimos gerar seu mapa.
           </h1>
 
-          <p className="muted">
-            {error}
+          <p>
+            {erro ||
+              'Tente novamente em alguns instantes.'}
           </p>
 
-          <a
-            className="btn primary"
-            href="/questionario"
-            style={{
-              display: 'inline-block',
-              textDecoration: 'none',
-              marginTop: '20px',
-            }}
+          <button
+            onClick={() =>
+              window.location.reload()
+            }
+            className="retry"
           >
             TENTAR NOVAMENTE
-          </a>
+          </button>
         </div>
+
+        <style jsx>{`
+          .page {
+            min-height: 100vh;
+            background: #05070d;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .errorBox {
+            max-width: 600px;
+            text-align: center;
+          }
+
+          .errorIcon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(
+              239,
+              68,
+              68,
+              0.15
+            );
+            color: #f87171;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 30px;
+            font-weight: 900;
+          }
+
+          .eyebrow {
+            color: #38bdf8;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+          }
+
+          h1 {
+            font-size: 34px;
+            margin: 12px 0;
+          }
+
+          p:not(.eyebrow) {
+            color: #94a3b8;
+            line-height: 1.7;
+          }
+
+          .retry {
+            margin-top: 20px;
+            border: 0;
+            border-radius: 12px;
+            padding: 14px 20px;
+            background: #2563eb;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+          }
+        `}</style>
       </main>
     );
   }
 
-  const skills = String(answers.skills || '');
-  const interests = String(answers.interests || '');
-
-  const time = Array.isArray(answers.time)
-    ? answers.time.join(', ')
-    : String(answers.time || '');
-
-  const resources = Array.isArray(answers.resources)
-    ? answers.resources.join(', ')
-    : String(answers.resources || '');
-
-  const goal = Array.isArray(answers.goal)
-    ? answers.goal.join(', ')
-    : String(answers.goal || '');
-
   return (
-    <main className="wrap">
-      <nav className="nav">
-        <div className="brand">
-          ALFOR<span>TECH</span>
-        </div>
-
-        <div className="pill">
-          Seu Mapa
-        </div>
-      </nav>
-
-      {/* HERO */}
-
-      <section className="hero">
-        <div className="eyebrow">
-          MAPA DA OPORTUNIDADE
-        </div>
-
-        <h1>
-          Seu mapa personalizado está pronto.
-        </h1>
-
-        <p>
-          A inteligência artificial analisou seu perfil
-          e encontrou oportunidades compatíveis com
-          o que você já possui.
-        </p>
-      </section>
-
-      {/* PERFIL */}
-
-      <section className="formbox">
-        <div className="q">
-          SEU PERFIL
-        </div>
-
-        <h2>
-          O ponto de partida
-        </h2>
-
-        <div className="grid">
-          <div className="card">
-            <div>🧠</div>
-
-            <h3>
-              Habilidades
-            </h3>
-
-            <p>
-              {skills}
-            </p>
-          </div>
-
-          <div className="card">
-            <div>🎯</div>
-
-            <h3>
-              Interesses
-            </h3>
-
-            <p>
-              {interests}
-            </p>
-          </div>
-
-          <div className="card">
-            <div>⏱️</div>
-
-            <h3>
-              Tempo disponível
-            </h3>
-
-            <p>
-              {time}
-            </p>
-          </div>
-
-          <div className="card">
-            <div>🛠️</div>
-
-            <h3>
-              Recursos
-            </h3>
-
-            <p>
-              {resources}
-            </p>
-          </div>
-
-          <div className="card">
-            <div>💰</div>
-
-            <h3>
-              Meta mensal
-            </h3>
-
-            <p>
-              {goal}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* OPORTUNIDADES */}
-
-      <section className="formbox">
-        <div className="q">
-          OPORTUNIDADES
-        </div>
-
-        <h2>
-          3 caminhos para você explorar
-        </h2>
-
-        <p className="muted">
-          A IA encontrou estas oportunidades com base
-          no seu perfil.
-        </p>
-
-        {mapa.oportunidades.map(
-          (opportunity, index) => {
-            const key = `opportunity-${index}`;
-            const isOpen = openSection === key;
-
-            return (
-              <div
-                key={key}
-                className="card"
-                onClick={() => toggleSection(key)}
-                style={{
-                  cursor: 'pointer',
-                  marginTop: '18px',
-                  border:
-                    index === 0
-                      ? '1px solid rgba(120, 150, 255, 0.35)'
-                      : undefined,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '28px',
-                    marginBottom: '8px',
-                  }}
-                >
-                  {index === 0
-                    ? '💡'
-                    : index === 1
-                    ? '🚀'
-                    : '🔥'}
-                </div>
-
-                <h3>
-                  {opportunity.titulo}
-                </h3>
-
-                <p>
-                  {opportunity.descricao}
-                </p>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                      'repeat(auto-fit, minmax(150px, 1fr))',
-                    gap: '10px',
-                    marginTop: '18px',
-                  }}
-                >
-                  <div className="option active">
-                    <strong>
-                      💰 Preço
-                    </strong>
-
-                    <p>
-                      {opportunity.preco_sugerido}
-                    </p>
-                  </div>
-
-                  <div className="option active">
-                    <strong>
-                      🎯 Meta
-                    </strong>
-
-                    <p>
-                      {opportunity.clientes_para_meta}
-                    </p>
-                  </div>
-
-                  <div className="option active">
-                    <strong>
-                      ⚡ Primeira venda
-                    </strong>
-
-                    <p>
-                      {opportunity.velocidade_para_primeira_venda}
-                    </p>
-                  </div>
-
-                  <div className="option active">
-                    <strong>
-                      📊 Dificuldade
-                    </strong>
-
-                    <p>
-                      {opportunity.dificuldade}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: '20px',
-                  }}
-                >
-                  <strong>
-                    {isOpen
-                      ? '▲ Fechar detalhes'
-                      : '▼ Ver detalhes completos'}
-                  </strong>
-                </div>
-
-                {isOpen && (
-                  <div
-                    style={{
-                      marginTop: '20px',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div className="option active">
-                      <strong>
-                        🛍️ O que vender
-                      </strong>
-
-                      <p>
-                        {opportunity.o_que_vender}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        👤 Cliente ideal
-                      </strong>
-
-                      <p>
-                        {opportunity.cliente_ideal}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        💰 Quanto cobrar
-                      </strong>
-
-                      <p>
-                        {opportunity.preco_sugerido}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        🔄 Modelo de receita
-                      </strong>
-
-                      <p>
-                        {opportunity.modelo_de_receita}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        🎯 Quantos clientes para sua meta
-                      </strong>
-
-                      <p>
-                        {opportunity.clientes_para_meta}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        💵 Investimento inicial
-                      </strong>
-
-                      <p>
-                        {opportunity.investimento_inicial}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        📈 Potencial
-                      </strong>
-
-                      <p>
-                        {opportunity.potencial}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        📣 Como conseguir clientes
-                      </strong>
-
-                      <p>
-                        {opportunity.como_conseguir_clientes}
-                      </p>
-                    </div>
-
-                    <div className="option active">
-                      <strong>
-                        🧠 Por que combina com você
-                      </strong>
-
-                      <p>
-                        {opportunity.por_que_combina}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          }
-        )}
-      </section>
-
-      {/* RECOMENDAÇÃO */}
-
-      <section className="formbox">
-        <div className="q">
-          RECOMENDAÇÃO DA IA
-        </div>
-
-        <h2>
-          ⭐ {mapa.recomendacao.titulo}
-        </h2>
-
-        <p>
-          {mapa.recomendacao.motivo}
-        </p>
-
-        <div
-          className="option active"
-          style={{
-            marginTop: '20px',
-          }}
-        >
-          <strong>
-            🚀 Primeiro passo
-          </strong>
-
-          <p>
-            {mapa.recomendacao.primeiro_passo}
-          </p>
-        </div>
-      </section>
-
-      {/* PLANO DE 7 DIAS */}
-
-      <section className="formbox">
-        <div className="q">
-          PLANO DE AÇÃO
-        </div>
-
-        <h2>
-          🚀 Seus próximos 7 dias
-        </h2>
-
-        <p className="muted">
-          Um plano prático para transformar a oportunidade
-          em ação.
-        </p>
-
-        <div
-          className="card"
-          onClick={() => toggleSection('plano')}
-          style={{
-            cursor: 'pointer',
-            marginTop: '18px',
-          }}
-        >
-          <h3>
-            Plano de 7 dias
-          </h3>
-
-          <strong>
-            {openSection === 'plano'
-              ? '▲ Fechar plano'
-              : '▼ Abrir plano'}
-          </strong>
-
-          {openSection === 'plano' && (
-            <div
-              style={{
-                marginTop: '20px',
-                textAlign: 'left',
-              }}
-            >
-              {mapa.plano_7_dias.map(
-                (dia, index) => (
-                  <div
-                    key={index}
-                    className="option active"
-                    style={{
-                      marginTop: '10px',
-                    }}
-                  >
-                    <strong>
-                      DIA {index + 1}
-                    </strong>
-
-                    <p>
-                      {dia}
-                    </p>
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* FINAL */}
-
-      <section
-        className="formbox"
-        style={{
-          textAlign: 'center',
-        }}
-      >
-        <div className="q">
-          AGORA É COM VOCÊ
-        </div>
-
-        <h2>
-          Uma oportunidade só vira renda quando você começa.
-        </h2>
-
-        <p className="muted">
-          Use este mapa como ponto de partida e execute
-          o primeiro passo ainda hoje.
-        </p>
-      </section>
-
-      <div className="footer">
-        ALFORTECH • Inteligência artificial aplicada a
-        oportunidades reais.
-      </div>
-    </main>
+    <MapaVisual
+      resultado={resultado}
+      answers={answers}
+      mapaId={mapaId ?? undefined}
+    />
   );
 }

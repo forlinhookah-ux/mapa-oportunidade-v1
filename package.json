@@ -9,13 +9,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
+    "html2pdf.js": "^0.14.0",
     "next": "latest",
     "openai": "^7.28.0",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
-    "@types/node": "latest",
+    "@types/node": "^26.6.4",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "typescript": "latest"

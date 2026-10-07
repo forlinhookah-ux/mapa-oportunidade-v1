@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 
@@ -22,9 +22,9 @@ const questions = [
     type: 'options',
     options: [
       'Até 5 horas/semana',
-      '5–10 horas/semana',
-      '10–20 horas/semana',
-      '20–40 horas/semana',
+      '5-10 horas/semana',
+      '10-20 horas/semana',
+      '20-40 horas/semana',
       'Mais de 40 horas/semana',
     ],
   },
@@ -98,34 +98,34 @@ export default function Questionario() {
       return;
     }
 
-   const response = await fetch('/api/salvar-respostas', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify(answers),
-});
+    const response = await fetch('/api/salvar-respostas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(answers),
+    });
 
-if (!response.ok) {
-  alert('Não foi possível salvar suas respostas. Tente novamente.');
-  return;
-}
+    if (!response.ok) {
+      alert('Não foi possível salvar suas respostas. Tente novamente.');
+      return;
+    }
 
-const data = await response.json();
+    const data = await response.json();
 
-sessionStorage.setItem(
-  'mapa_answers',
-  JSON.stringify(answers)
-);
+    sessionStorage.setItem(
+      'mapa_answers',
+      JSON.stringify(answers)
+    );
 
-sessionStorage.setItem(
-  'mapa_id',
-  data.id
-);
+    sessionStorage.setItem(
+      'mapa_id',
+      data.id
+    );
 
-window.location.href =
-  `https://pay.cakto.com.br/gz6wagz_1173401?sck=${encodeURIComponent(data.id)}`;
- }
+    window.location.href =
+      `https://pay.cakto.com.br/gz6wagz_1173401?sck=${encodeURIComponent(data.id)}`;
+  }
 
   return (
     <main className="wrap">
@@ -192,7 +192,7 @@ window.location.href =
               className="btn ghost"
               onClick={() => setStep(step - 1)}
             >
-              ← Voltar
+              Voltar
             </button>
           ) : (
             <span />
@@ -205,7 +205,7 @@ window.location.href =
           >
             {step === 4
               ? 'GERAR MEU MAPA'
-              : 'Continuar →'}
+              : 'Continuar'}
           </button>
         </div>
       </div>
